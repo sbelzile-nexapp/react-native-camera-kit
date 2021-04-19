@@ -339,7 +339,7 @@ class CKCamera(context: ThemedReactContext) : FrameLayout(context), LifecycleObs
                 }
             })
 
-            if (!imageCapture) {
+            if (imageCapture == null) {
                 promise.reject("E_CAPTURE_FAILED lol", "imageCapture is not defined yo")
             }
         } catch (error: Exception) {
