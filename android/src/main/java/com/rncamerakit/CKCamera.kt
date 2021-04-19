@@ -280,63 +280,71 @@ class CKCamera(context: ThemedReactContext) : FrameLayout(context), LifecycleObs
     }
 
     fun capture(options: Map<String, Any>, promise: Promise) {
-        // Create output options object which contains file + metadata
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_" + System.currentTimeMillis())
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
-        }
-
-        // Create the output file option to store the captured image in MediaStore
-        val outputOptions = when (outputPath) {
-            null -> ImageCapture.OutputFileOptions
-                    .Builder(
-                            context.contentResolver,
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                            contentValues
-                    )
-                    .build()
-            else -> ImageCapture.OutputFileOptions
-                    .Builder(File(outputPath))
-                    .build()
-        }
-
-        flashViewFinder()
-
-        val audio = getActivity().getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (audio.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
-            MediaActionSound().play(MediaActionSound.SHUTTER_CLICK);
-        }
-
-        // Setup image capture listener which is triggered after photo has
-        // been taken
-        imageCapture?.takePicture(
-                outputOptions, ContextCompat.getMainExecutor(getActivity()), object : ImageCapture.OnImageSavedCallback {
-            override fun onError(ex: ImageCaptureException) {
-                Log.e(TAG, "CameraView: Photo capture failed: ${ex.message}", ex)
-                promise.reject("E_CAPTURE_FAILED", "takePicture failed: ${ex.message}")
+        try {
+            // Create output options object which contains file + metadata
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_" + System.currentTimeMillis())
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
             }
 
-            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                try {
-                    val savedUri = output.savedUri.toString()
-                    onPictureTaken(savedUri)
-                    Log.d(TAG, "CameraView: Photo capture succeeded: $savedUri")
+            // Create the output file option to store the captured image in MediaStore
+            val outputOptions = when (outputPath) {
+                null -> ImageCapture.OutputFileOptions
+                        .Builder(
+                                context.contentResolver,
+                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                contentValues
+                        )
+                        .build()
+                else -> ImageCapture.OutputFileOptions
+                        .Builder(File(outputPath))
+                        .build()
+            }
 
-                    val imageInfo = Arguments.createMap()
-                    imageInfo.putString("uri", savedUri)
-                    imageInfo.putString("id", output.savedUri?.path)
-                    imageInfo.putString("name", output.savedUri?.lastPathSegment)
-                    imageInfo.putInt("width", width)
-                    imageInfo.putInt("height", height)
-                    imageInfo.putString("path", output.savedUri?.path)
+            flashViewFinder()
 
-                    promise.resolve(imageInfo)
-                } catch (ex: Exception) {
-                    Log.e(TAG, "Error while saving or decoding saved photo: ${ex.message}", ex)
-                    promise.reject("E_ON_IMG_SAVED", "Error while reading saved photo: ${ex.message}")
+            val audio = getActivity().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (audio.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+                MediaActionSound().play(MediaActionSound.SHUTTER_CLICK);
+            }
+
+            // Setup image capture listener which is triggered after photo has
+            // been taken
+            imageCapture?.takePicture(
+                    outputOptions, ContextCompat.getMainExecutor(getActivity()), object : ImageCapture.OnImageSavedCallback {
+                override fun onError(ex: ImageCaptureException) {
+                    Log.e(TAG, "CameraView: Photo capture failed: ${ex.message}", ex)
+                    promise.reject("E_CAPTURE_FAILED", "takePicture failed: ${ex.message}")
                 }
+
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    try {
+                        val savedUri = output.savedUri.toString()
+                        onPictureTaken(savedUri)
+                        Log.d(TAG, "CameraView: Photo capture succeeded: $savedUri")
+
+                        val imageInfo = Arguments.createMap()
+                        imageInfo.putString("uri", savedUri)
+                        imageInfo.putString("id", output.savedUri?.path)
+                        imageInfo.putString("name", output.savedUri?.lastPathSegment)
+                        imageInfo.putInt("width", width)
+                        imageInfo.putInt("height", height)
+                        imageInfo.putString("path", output.savedUri?.path)
+
+                        promise.resolve(imageInfo)
+                    } catch (ex: Exception) {
+                        Log.e(TAG, "Error while saving or decoding saved photo: ${ex.message}", ex)
+                        promise.reject("E_ON_IMG_SAVED", "Error while reading saved photo: ${ex.message}")
+                    }
+                }
+            })
+
+            if (!imageCapture) {
+                promise.reject("E_CAPTURE_FAILED lol", "imageCapture is not defined yo")
             }
-        })
+        } catch (error: Exception) {
+            promise.reject("E_CAPTURE_FAILED lol", "takePicture failed: ${error.message}")
+        }
     }
 
     private fun focusOnPoint(x: Float?, y: Float?) {
